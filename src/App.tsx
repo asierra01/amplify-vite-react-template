@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import type { Schema } from "../amplify/data/resource";
 import { generateClient } from "aws-amplify/data";
 
@@ -7,32 +7,38 @@ function App() {
   const [isBackendConfigured, setIsBackendConfigured] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  // Create client once and memoize it
+  const client = useMemo(() => {
     try {
-      const client = generateClient<Schema>();
-      const subscription = client.models.Todo.observeQuery().subscribe({
-        next: (data) => setTodos([...data.items]),
-        error: (err) => {
-          console.error("Error fetching todos:", err);
-          setError(err.message);
-          setIsBackendConfigured(false);
-        },
-      });
-      return () => subscription.unsubscribe();
+      return generateClient<Schema>();
     } catch (err) {
       console.error("Error initializing client:", err);
       setIsBackendConfigured(false);
       setError(err instanceof Error ? err.message : "Unknown error");
+      return null;
     }
   }, []);
 
+  useEffect(() => {
+    if (!client) return;
+
+    const subscription = client.models.Todo.observeQuery().subscribe({
+      next: (data) => setTodos([...data.items]),
+      error: (err) => {
+        console.error("Error fetching todos:", err);
+        setError(err.message);
+        setIsBackendConfigured(false);
+      },
+    });
+    return () => subscription.unsubscribe();
+  }, [client]);
+
   function createTodo() {
-    try {
-      const client = generateClient<Schema>();
-      client.models.Todo.create({ content: window.prompt("Todo content") });
-    } catch (err) {
-      console.error("Error creating todo:", err);
-      setError(err instanceof Error ? err.message : "Unknown error");
+    if (!client) return;
+
+    const content = window.prompt("Todo content");
+    if (content) {
+      client.models.Todo.create({ content });
     }
   }
 
