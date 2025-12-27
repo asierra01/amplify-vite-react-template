@@ -2,19 +2,72 @@ import { useEffect, useState } from "react";
 import type { Schema } from "../amplify/data/resource";
 import { generateClient } from "aws-amplify/data";
 
-const client = generateClient<Schema>();
-
 function App() {
   const [todos, setTodos] = useState<Array<Schema["Todo"]["type"]>>([]);
+  const [isBackendConfigured, setIsBackendConfigured] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    client.models.Todo.observeQuery().subscribe({
-      next: (data) => setTodos([...data.items]),
-    });
+    try {
+      const client = generateClient<Schema>();
+      const subscription = client.models.Todo.observeQuery().subscribe({
+        next: (data) => setTodos([...data.items]),
+        error: (err) => {
+          console.error("Error fetching todos:", err);
+          setError(err.message);
+          setIsBackendConfigured(false);
+        },
+      });
+      return () => subscription.unsubscribe();
+    } catch (err) {
+      console.error("Error initializing client:", err);
+      setIsBackendConfigured(false);
+      setError(err instanceof Error ? err.message : "Unknown error");
+    }
   }, []);
 
   function createTodo() {
-    client.models.Todo.create({ content: window.prompt("Todo content") });
+    try {
+      const client = generateClient<Schema>();
+      client.models.Todo.create({ content: window.prompt("Todo content") });
+    } catch (err) {
+      console.error("Error creating todo:", err);
+      setError(err instanceof Error ? err.message : "Unknown error");
+    }
+  }
+
+  if (!isBackendConfigured) {
+    return (
+      <main>
+        <h1>⚙️ AWS Amplify React+Vite Starter</h1>
+        <div style={{ padding: "20px", maxWidth: "600px" }}>
+          <h2>Backend Not Configured</h2>
+          <p>
+            To use this application with a live backend, you need to start the
+            Amplify sandbox or deploy your backend.
+          </p>
+          <h3>Quick Start:</h3>
+          <ol style={{ textAlign: "left" }}>
+            <li>
+              Open a terminal and run: <code>npx ampx sandbox</code>
+            </li>
+            <li>Wait for the sandbox to deploy (this may take a few minutes)</li>
+            <li>Refresh this page</li>
+          </ol>
+          <p>
+            <a href="https://docs.amplify.aws/react/start/quickstart/">
+              📚 Read the full documentation
+            </a>
+          </p>
+          {error && (
+            <details style={{ marginTop: "20px", textAlign: "left" }}>
+              <summary>Error Details</summary>
+              <pre style={{ fontSize: "12px", overflow: "auto" }}>{error}</pre>
+            </details>
+          )}
+        </div>
+      </main>
+    );
   }
 
   return (
