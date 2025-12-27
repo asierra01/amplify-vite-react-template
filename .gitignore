@@ -25,5 +25,6 @@ dist-ssr
 
 # amplify
 .amplify
-amplify_outputs*
 amplifyconfiguration*
+# amplify_outputs.json is committed as a placeholder
+# but will be overwritten when running sandbox/deployment
